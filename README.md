@@ -91,14 +91,12 @@ Every verb is a standalone function; `defineSystem` only binds three of them to 
 
 | Law | Severity | Behavior as implemented |
 |-----|----------|-------------------------|
-| Raw hex ban | error | Any `#` followed by 3 to 8 hex digits in a component file is rejected; use tokens |
-| Import whitelist | error | Every `from '...'` specifier must be relative (`./`, `../`) or listed in `allowedImports` (default `['react', 'react-dom']`). An entry ending in `/` is a prefix (`'acme-forms/'` allows any subpath); any other entry must match exactly |
-| Native element ban | error | For each `{ tag, exceptIn }` in `nativeElements`, a file containing `<tag` fails unless its file stem is in `exceptIn`. Empty by default |
+| Raw hex ban | error | Any `#` followed by exactly 3, 4, 6 or 8 hex digits in a component file is rejected; use tokens. URL fragments are not colors and are skipped: `href="#id"` (including `xlink:href`) and `url(#id)` |
+| Import whitelist | error | Every module specifier — `import`/`export ... from`, side-effect `import 'x'`, dynamic `import('x')` and `require('x')`, single or double quoted — must be relative (`./`, `../`) or listed in `allowedImports` (default `['react', 'react-dom']`). An entry ending in `/` is a prefix (`'acme-forms/'` allows any subpath); any other entry must match exactly |
+| Native element ban | error | For each `{ tag, exceptIn }` in `nativeElements`, a file containing `<tag` followed by whitespace, `>` or `/` (so `<button>` matches but `<buttonGroup>` does not) fails unless its file stem is in `exceptIn`. Empty by default |
 | Numeric gap | warning | `gap: <number>` is reported as an advisory unless the file stem is in `numericSpacingExempt` |
-| Framework-free | error | `checkFrameworkFree` reads files directly inside each of `dirs` (not recursive; missing directories are skipped) and rejects imports equal to or starting with an entry in `frameworks` (default `react`, `react-dom`, `@angular/`, `vue`, `svelte`) |
+| Framework-free | error | `checkFrameworkFree` reads files directly inside each of `dirs` (not recursive; missing directories are skipped) and rejects any module specifier (same detection as the import whitelist) matching an entry in `frameworks` (default `react`, `react-dom`, `@angular/`, `vue`, `svelte`). An entry ending in `/` is a prefix (`@angular/core`); any other entry matches the package or its subpaths (`react`, `react/jsx-runtime`) but not a different package sharing the prefix (`react-aria`, `vuex`) |
 | Type gate | error | `enforce` runs `tsc --noEmit` when `root` is set and `<root>/node_modules` exists; without `node_modules` it emits a warning and skips |
-
-Import detection matches single-quoted `from '...'` specifiers only.
 
 ## Async contracts
 
@@ -178,7 +176,7 @@ There is no build step and no CLI; call the functions from your own build script
 
 Experimental. Known gaps:
 
-- No automated tests yet.
+- The law gates (`src/gates/check.mjs`) have automated tests, run with `npm test`; the other modules are not tested yet.
 - No license chosen yet.
 - No CI yet.
 - Not published to npm.
