@@ -3,6 +3,19 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
+// Module specifiers: `from 'x'` (imports + re-exports), side-effect `import 'x'`,
+// dynamic `import('x')` and `require('x')` — single or double quoted.
+const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"])([^'"\n]+)\1/g
+
+// CSS hex colors are exactly 3, 4, 6 or 8 digits. The lookbehind skips URL fragments —
+// `href="#id"` (incl. xlink:href) and `url(#id)` — which are anchors, not colors.
+const HEX_COLOR = /(?<!href\s*=\s*["']|url\(\s*["']?)#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g
+
+/** Every module specifier referenced by the source. Regex-based: comments and strings are not stripped. */
+function importSpecifiers(src) {
+  return [...src.matchAll(SPECIFIER)].map((m) => m[2])
+}
+
 /** Scan component implementations for law violations. Returns {errors, warnings}. */
 export function checkLaws({ componentsDir, allowedImports = ['react', 'react-dom'], nativeElements = [], numericSpacingExempt = [], extensions = ['.jsx', '.tsx'] }) {
   const errors = []
@@ -22,11 +35,10 @@ export function checkLaws({ componentsDir, allowedImports = ['react', 'react-dom
     const name = file.split(/[\\/]/).pop()
     const stem = name.replace(/\.[jt]sx?$/, '')
 
-    const hex = src.match(/#[0-9a-fA-F]{3,8}\b/g)
+    const hex = src.match(HEX_COLOR)
     if (hex) errors.push(`${name}: raw hex banned in DS components (${hex.join(', ')}) — use tokens`)
 
-    for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
-      const spec = m[1]
+    for (const spec of importSpecifiers(src)) {
       // Entries ending in '/' are prefixes (e.g. 'romeo-forms/' allows any subpath).
       const allowed =
         allowedImports.some((a) => (a.endsWith('/') ? spec.startsWith(a) : spec === a)) ||
@@ -38,7 +50,9 @@ export function checkLaws({ componentsDir, allowedImports = ['react', 'react-dom
     }
 
     for (const { tag, exceptIn = [] } of nativeElements) {
-      if (src.includes(`<${tag}`) && !exceptIn.includes(stem)) {
+      // Tag boundary (whitespace, '>' or '/') so <button> matches but <buttonGroup> does not.
+      const opensTag = new RegExp('<' + tag.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&') + '[\\s>/]')
+      if (opensTag.test(src) && !exceptIn.includes(stem)) {
         errors.push(`${name}: native <${tag}> banned outside ${exceptIn.join('/') || 'nowhere'}`)
       }
     }
@@ -59,9 +73,10 @@ export function checkFrameworkFree({ dirs, frameworks = ['react', 'react-dom', '
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (e.isDirectory()) continue
       const src = readFileSync(join(dir, e.name), 'utf8')
-      for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
-        if (frameworks.some((f) => m[1] === f || m[1].startsWith(f))) {
-          errors.push(`${e.name}: framework import '${m[1]}' banned in a core — framework code lives only in leaf bindings`)
+      for (const spec of importSpecifiers(src)) {
+        // 'x/' entries are prefixes; others match the package or its subpaths, never 'x-other'.
+        if (frameworks.some((f) => (f.endsWith('/') ? spec.startsWith(f) : spec === f || spec.startsWith(`${f}/`)))) {
+          errors.push(`${e.name}: framework import '${spec}' banned in a core — framework code lives only in leaf bindings`)
         }
       }
     }

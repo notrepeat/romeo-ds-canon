@@ -9,6 +9,9 @@
       "types": "./contracts/index.d.ts"
     }
   },
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "esbuild": "^0.28.1",
     "odiff-bin": "^4.3.8",
