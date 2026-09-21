@@ -1,0 +1,18 @@
+{
+  "name": "romeo-ds-canon",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "House design-system canon as executable tooling: artifact emission, prompt derivation, law/type/visual gates, manifest. Aesthetic-agnostic; framework code only in leaf bindings.",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./contracts": {
+      "types": "./contracts/index.d.ts"
+    }
+  },
+  "dependencies": {
+    "esbuild": "^0.28.1",
+    "odiff-bin": "^4.3.8",
+    "playwright": "^1.61.1",
+    "ts-morph": "^28.0.0"
+  }
+}
